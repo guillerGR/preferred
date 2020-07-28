@@ -23,9 +23,10 @@ ListHistoryResult = NamedTuple("ListHistoryResult", [("name", str), ("ticker", s
                                                      ("event_date_timestamp", int)])
 SecurityResult = namedtuple("SecurityResult", ["name", "country", "currency", "country_weight", "currency_weight",
                                                "ir_website"])
-SecurityHistoryResult = NamedTuple("SecurityHistoryResult", [("list_name", str),  ("event_name", str),
+SecurityHistoryResult = NamedTuple("SecurityHistoryResult", [("list_name", str), ("event_name", str),
                                                              ("event_date_timestamp", int), ("pref_list", str),
                                                              ("event_note", str)])
+SecurityCountryResult = namedtuple("SecurityCountryResult", ["ticker", "name", "ir_website", "country"])
 
 
 class Database:
@@ -76,8 +77,11 @@ class Database:
             raise ValueError(f"Found no primary key match for value: {column_value}")
 
     def insert_security(self, security):
-        country_id = self.get_primary_key_value_for_ticker("countries", security.country)
-        currency_id = self.get_primary_key_value_for_ticker("currencies", security.currency)
+        try:
+            country_id = self.get_primary_key_value_for_ticker("countries", security.country)
+            currency_id = self.get_primary_key_value_for_ticker("currencies", security.currency)
+        except Exception as e:
+            print(f"Could not insert security. Reason: {e}")
 
         try:
             self.cursor.execute("INSERT INTO securities(name, ticker, country_id, currency_id, ir_website) "
@@ -88,16 +92,23 @@ class Database:
             print(f"Integrity Error: {e}, primary key value: {security.ticker}")
 
     def insert_earnings_date(self, earnings_date):
-        security_id = self.get_primary_key_value_for_ticker("securities", earnings_date.security)
+        try:
+            security_id = self.get_primary_key_value_for_ticker("securities", earnings_date.security)
+        except Exception as e:
+            print(f"Could not insert earnings date. Reason: {e}")
 
         self.cursor.execute("INSERT INTO earnings_dates(security_id, date_epoch) VALUES (?, ?)",
                             (security_id, earnings_date.timestamp))
         self.connection.commit()
 
     def insert_list_change(self, list_change):
-        security_id = self.get_primary_key_value_for_ticker("securities", list_change.security_ticker)
-        list_id = self.get_primary_key_value_for_ticker("lists", list_change.pref_list)
-        event_id = self.get_primary_key_value_for_ticker("list_change_events", list_change.event)
+        try:
+            security_id = self.get_primary_key_value_for_ticker("securities", list_change.security_ticker)
+            list_id = self.get_primary_key_value_for_ticker("lists", list_change.pref_list)
+            event_id = self.get_primary_key_value_for_ticker("list_change_events", list_change.event)
+        except Exception as e:
+            print(f"Could not insert list change. Reason: {e}")
+            return
 
         self.cursor.execute("INSERT INTO list_changes(security_id, list_id, event_id, date_epoch) "
                             "VALUES (?, ?, ?, ?)", (security_id, list_id, event_id, list_change.timestamp))
@@ -236,3 +247,12 @@ class Database:
                                    "AND s.security_id = c.security_id ORDER BY l.ticker ASC, c.date_epoch DESC")
 
         return map(SecurityHistoryResult._make, histories)
+
+    def query_all_securities(self):
+        securities = self.run_query("SELECT s.ticker, s.name, s.ir_website, c.name FROM securities s, countries c WHERE "
+                                 "s.country_id = c.country_id")
+        securities += self.run_query("SELECT s.ticker, a.alt_name, s.ir_website, c.name FROM securities s, "
+                                  "securities_alt_names a, countries c WHERE a.security_id = s.security_id AND "
+                                  "s.country_id = c.country_id")
+
+        return map(SecurityCountryResult._make, securities)
