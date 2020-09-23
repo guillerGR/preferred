@@ -103,9 +103,10 @@ def query_points(*args):
 
 
 def query_time_weighted_points(*args):
-    threshold_days = int(args[0]) if args else POINTS_DAYS_THRESHOLD
+    country_ticker = args[0] if args else None
 
-    aggregated_values = process_weighted_points_results(*db.query_time_weighted_points(threshold_days))
+    aggregated_values = process_weighted_points_results(*db.query_time_weighted_points(POINTS_DAYS_THRESHOLD,
+                                                                                       country=country_ticker))
 
     aggregated_values.sort(reverse=True)
     for value in aggregated_values:

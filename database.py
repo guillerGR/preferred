@@ -197,16 +197,18 @@ class Database:
                                 f"{ticker_filter} GROUP BY s.ticker ORDER BY points DESC")
         return map(PointsResult._make, points)
 
-    def query_time_weighted_points(self, threshold_days, ticker=None):
+    def query_time_weighted_points(self, threshold_days, ticker=None, country=None):
         current_time = int(time.time())
         threshold_seconds = days_to_seconds(threshold_days)
         threshold_time = current_time - threshold_seconds
+        country_id = None if country is None else self.get_primary_key_value_for_ticker("countries", country)
         ticker_filter = "" if ticker is None else f"AND s.ticker = '{ticker}'"
+        country_filter = "" if country_id is None else f"AND c.country_id = '{country_id}'"
 
-        results = self.run_query("SELECT s.name, s.ticker, e.value, c.date_epoch FROM securities s, "
-                                 "list_changes c, list_change_events e WHERE e.event_id = c.event_id "
-                                 f"AND s.security_id = c.security_id AND c.date_epoch > {threshold_time} "
-                                 f"{ticker_filter} ORDER BY s.ticker")
+        results = self.run_query("SELECT s.name, s.ticker, e.value, lc.date_epoch FROM securities s, "
+                                 "list_changes lc, list_change_events e, countries c WHERE e.event_id = lc.event_id "
+                                 f"AND s.security_id = lc.security_id AND lc.date_epoch > {threshold_time} "
+                                 f"AND s.country_id = c.country_id {ticker_filter} {country_filter} ORDER BY s.ticker")
 
         factor_calculator = TimeFactorCalculator(current_time, threshold_seconds)
         return map(TimeWeightedPointsResult._make, results), factor_calculator
