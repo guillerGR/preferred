@@ -169,8 +169,9 @@ def query_ticker(ticker):
 
     print(f"Name: {security.name}\nCountry: {security.country} ({security.country_weight})"
           f"\nCurrency: {security.currency} ({security.currency_weight})\nIR: {security.ir_website}"
-          f"\nPoints: {print_points_summary_for_ticker(ticker)})")
-    print(f"\n\n### List History ###{print_histories(histories)}")
+          f"\nPoints: {print_points_summary_for_ticker(ticker)}")
+    print(f"\n\n### List History ({print_number_of_active_lists_for_ticker(ticker)}) ###"
+          f"{print_histories(histories)}")
     print(f"\n### Earnings History ###{print_earnings_for_ticker(ticker)}")
 
 
@@ -202,6 +203,12 @@ def print_histories(histories):
                   f"{'' if history_event.event_note is None else history_event.event_note}"
 
     return result
+
+
+def print_number_of_active_lists_for_ticker(ticker):
+    number_of_lists = db.query_number_of_active_lists(ticker)
+    list_word = "lists" if number_of_lists != 1 else "list"
+    return f"{number_of_lists} active {list_word}"
 
 
 def clean_up():

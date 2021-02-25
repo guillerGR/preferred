@@ -27,6 +27,8 @@ SecurityHistoryResult = NamedTuple("SecurityHistoryResult", [("list_name", str),
                                                              ("event_date_timestamp", int), ("pref_list", str),
                                                              ("event_note", str)])
 SecurityCountryResult = namedtuple("SecurityCountryResult", ["ticker", "name", "ir_website", "country"])
+ListAggregateSignResult = NamedTuple("ListAggregateSignResult", [("name", str), ("ticker", str),
+                                                                 ("aggregate_event_value_sign", int)])
 
 
 class Database:
@@ -258,3 +260,12 @@ class Database:
                                   "s.country_id = c.country_id")
 
         return map(SecurityCountryResult._make, securities)
+
+    def query_number_of_active_lists(self, ticker):
+        list_sign_results = self.run_query(
+            "SELECT l.name, l.ticker, SUM(e.value_sign) FROM lists l, securities s, list_changes c, "
+            f"list_change_events e WHERE s.ticker = '{ticker}' AND e.event_id = c.event_id "
+            "AND c.list_id = l.list_id AND s.security_id = c.security_id GROUP BY l.ticker ORDER BY l.name DESC")
+
+        parsed_results = map(ListAggregateSignResult._make, list_sign_results)
+        return len([result for result in parsed_results if result.aggregate_event_value_sign > 0])
