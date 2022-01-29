@@ -1,3 +1,5 @@
+from itertools import groupby
+
 from database import Database
 from date_util import timestamp_to_swiss_date
 from earnings_date import EarningsDate
@@ -16,7 +18,7 @@ MENU_OPTIONS = [MenuOption(["s"], "add_security"), MenuOption(["e", "ed"], "add_
                 MenuOption(["hl"], "query_list_history"), MenuOption(["d"], "switch_databases"),
                 MenuOption(["he"], "query_earnings_for_ticker"), MenuOption(["a"], "query_ticker"),
                 MenuOption(["ra"], "add_analyst"), MenuOption(["salt"], "add_security_alt_name"),
-                MenuOption(["q"], "clean_up")]
+                MenuOption(["n"], "query_intersection_of_lists"), MenuOption(["q"], "clean_up")]
 PRIVATE_DB_PATH = "private.db"
 PUBLIC_DB_PATH = "public.db"
 POINTS_DAYS_THRESHOLD = 90
@@ -75,10 +77,34 @@ def query_list_components(pref_list):
 
     list_components = db.query_list_components(pref_list)
     print(f"== {list_info.name} (weight {list_info.weight} / parent {list_info.parent_list_weight}) ==")
+    print_formatted_list_components(list_components)
+
+
+def print_formatted_list_components(list_components):
     for component in list_components:
         print(f"[added {timestamp_to_swiss_date(component.latest_change_timestamp)}] "
               f"{Security.summary(component.name, component.ticker)}: "
               f"{db.print_dates_summary(component.ticker)}")
+
+def query_intersection_of_lists(*pref_lists):
+    try:
+        list_names = [item.name for item in map(db.query_list_info, pref_lists)]
+    except Exception as e:
+        print(f"Could not find list(s): Reason {e}")
+        return
+
+    components_per_list = map(db.query_list_components, pref_lists)
+    components_results_flat = [item for list_result in components_per_list for item in list_result]
+    components_results_flat.sort(key=lambda item : (item.ticker, -item.latest_change_timestamp))
+    components_results_by_ticker = [list(result_for_ticker) for ticker, result_for_ticker
+                                    in groupby(components_results_flat, lambda item : item.ticker)]
+
+    number_of_input_lists = len(pref_lists)
+    intersection_of_lists = [result_for_ticker[0] for result_for_ticker in components_results_by_ticker
+                             if len(result_for_ticker) == number_of_input_lists]
+
+    print(f"== {' + '.join(list_names)} intersection ==")
+    print_formatted_list_components(intersection_of_lists)
 
 
 def query_security(name):
